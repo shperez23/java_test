@@ -674,18 +674,35 @@ public final class ExpressionCatalog {
         try (PreparedStatement statement = connection.prepareStatement(query);
              ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
-                String template = resultSet.getString("nombre_archivo_variable");
-                if (template == null || template.isBlank()) {
+                String sql = resultSet.getString("nombre_archivo_variable");
+                if (sql == null || sql.isBlank()) {
                     continue;
                 }
                 String idIngesta = resultSet.getString("id_ingesta");
                 String nombreArchivo = resultSet.getString("nombre_archivo");
                 String name = buildName(idIngesta, nombreArchivo);
-                ExpressionTemplate expressionTemplate = new ExpressionTemplate(template);
-                definitions.add(new ExpressionDefinition(name, template, expressionTemplate::render));
+                ExpressionTemplate expressionTemplate = resolveTemplate(sql);
+                definitions.add(new ExpressionDefinition(name, sql, expressionTemplate::render));
             }
         }
         return definitions;
+    }
+
+    private static ExpressionTemplate resolveTemplate(String sql) {
+        if (sql.contains("${")) {
+            return new ExpressionTemplate(sql);
+        }
+        String normalizedSql = normalizeSql(sql);
+        for (ExpressionTemplateDefinition templateDefinition : TEMPLATE_DEFINITIONS) {
+            if (normalizedSql.equals(normalizeSql(templateDefinition.sql()))) {
+                return templateDefinition.template();
+            }
+        }
+        return new ExpressionTemplate(sql);
+    }
+
+    private static String normalizeSql(String sql) {
+        return sql == null ? "" : sql.replaceAll("\\s+", "").toLowerCase();
     }
 
     private static String buildName(String idIngesta, String nombreArchivo) {
