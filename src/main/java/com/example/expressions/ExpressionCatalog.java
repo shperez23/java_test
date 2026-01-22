@@ -1,5 +1,9 @@
 package com.example.expressions;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -656,5 +660,55 @@ public final class ExpressionCatalog {
             definitions.add(templateDefinition.toDefinition());
         }
         return definitions;
+    }
+
+    public static List<ExpressionDefinition> definitions(Connection connection) throws SQLException {
+        String query = """
+                SELECT id_ingesta, nombre_archivo, nombre_archivo_variable
+                FROM public.cat_ingesta_archivo
+                WHERE nombre_archivo_variable IS NOT NULL
+                  AND nombre_archivo_variable <> ''
+                ORDER BY grupo_ingesta, orden_grupo, id_ingesta
+                """;
+        List<ExpressionDefinition> definitions = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(query);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                String sql = resultSet.getString("nombre_archivo_variable");
+                if (sql == null || sql.isBlank()) {
+                    continue;
+                }
+                String idIngesta = resultSet.getString("id_ingesta");
+                String nombreArchivo = resultSet.getString("nombre_archivo");
+                String name = buildName(idIngesta, nombreArchivo);
+                ExpressionTemplate expressionTemplate = resolveTemplate(sql);
+                definitions.add(new ExpressionDefinition(name, sql, expressionTemplate::render));
+            }
+        }
+        return definitions;
+    }
+
+    private static ExpressionTemplate resolveTemplate(String sql) {
+        if (sql.contains("${")) {
+            return new ExpressionTemplate(sql);
+        }
+        String normalizedSql = normalizeSql(sql);
+        for (ExpressionTemplateDefinition templateDefinition : TEMPLATE_DEFINITIONS) {
+            if (normalizedSql.equals(normalizeSql(templateDefinition.sql()))) {
+                return templateDefinition.template();
+            }
+        }
+        return new ExpressionTemplate(sql);
+    }
+
+    private static String normalizeSql(String sql) {
+        return sql == null ? "" : sql.replaceAll("\\s+", "").toLowerCase();
+    }
+
+    private static String buildName(String idIngesta, String nombreArchivo) {
+        if (nombreArchivo == null || nombreArchivo.isBlank()) {
+            return idIngesta;
+        }
+        return idIngesta + " - " + nombreArchivo;
     }
 }
