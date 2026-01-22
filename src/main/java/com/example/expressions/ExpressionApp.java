@@ -16,12 +16,12 @@ public final class ExpressionApp {
     public static void main(String[] args) {
         String idIngesta = args.length > 0 ? args[0] : "ID_INGESTA_000_000_123_456_789";
         ExpressionContext context = new ExpressionContext(Clock.systemUTC(), ZONE, idIngesta);
-        String dbUrl = envOrProperty("DB_URL");
+        String dbUrl = "jdbc:postgresql://localhost:5433/dbcamel";
         if (dbUrl == null || dbUrl.isBlank()) {
             throw new IllegalStateException("Missing DB_URL for public.cat_ingesta_archivo");
         }
-        String dbUser = envOrProperty("DB_USER");
-        String dbPassword = envOrProperty("DB_PASSWORD");
+        String dbUser = "postgres";
+        String dbPassword = "Lealtad23$";
 
         try (Connection connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
             List<ExpressionDefinition> definitions = ExpressionCatalog.definitions(connection);
